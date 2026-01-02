@@ -1,0 +1,86 @@
+import streamlit as st
+from streamlit_gsheets import GSheetsConnection
+import pandas as pd
+
+# --- APP CONFIG ---
+st.set_page_config(page_title="BASM Mission App", page_icon="🙏", layout="centered")
+
+# --- PUBLIC GOOGLE SHEET LINK ---
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1vC8G-f59yB5K8l-p5i9pY_nLhUj3h5vVz2j9Wn8P7A8/edit?usp=sharing"
+
+# Connection setup
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Session state initialization
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+# --- UI SETTINGS ---
+st.sidebar.title("BASM MENU")
+lang = st.sidebar.radio("भाषा चुनें / Select Language", ["Hindi", "English"])
+
+if lang == "Hindi":
+    t = {"title": "बुद्ध अंबेडकर सेल्फ केयर मिशन", "home": "होम", "reg": "नया पंजीकरण", "login": "सदस्य लॉगिन", "admin": "एडमिन पैनल", "name": "पूरा नाम", "mob": "मोबाइल नंबर", "adh": "आधार नंबर", "dist": "जिला", "caste": "जाति", "pass": "पासवर्ड", "btn_reg": "अभी पंजीकरण करें", "btn_log": "लॉगिन करें", "success": "पंजीकरण सफल रहा!", "admin_msg": "सभी सदस्यों का डेटा:"}
+else:
+    t = {"title": "Budh Ambedkar Self Care Mission", "home": "Home", "reg": "New Registration", "login": "Member Login", "admin": "Admin Panel", "name": "Full Name", "mob": "Mobile Number", "adh": "Aadhar Number", "dist": "District", "caste": "Caste", "pass": "Password", "btn_reg": "Register Now", "btn_log": "Login", "success": "Registration Successful!", "admin_msg": "All Member Data:"}
+
+st.title(t["title"])
+choice = st.sidebar.selectbox("Option", [t["home"], t["reg"], t["login"], t["admin"]])
+
+# --- 1. HOME ---
+if choice == t["home"]:
+    st.image("https://images.unsplash.com/photo-1577563908411-5077b6cf7624?q=80&w=1000", caption="Social Mission", use_container_width=True)
+    st.write("### " + ("स्वागत है" if lang=="Hindi" else "Welcome"))
+    st.info("यह ऐप बुद्ध अंबेडकर सेल्फ केयर मिशन के सदस्यों के लिए बनाया गया है।" if lang=="Hindi" else "This app is built for members of Budh Ambedkar Self Care Mission.")
+
+# --- 2. REGISTRATION ---
+elif choice == t["reg"]:
+    st.header(t["reg"])
+    with st.form("reg_form"):
+        name = st.text_input(t["name"])
+        mobile = st.text_input(t["mob"])
+        aadhar = st.text_input(t["adh"])
+        district = st.text_input(t["dist"])
+        caste = st.selectbox(t["caste"], ["SC", "ST", "OBC", "Minority"])
+        password = st.text_input(t["pass"], type="password")
+        
+        if st.form_submit_button(t["btn_reg"]):
+            if name and mobile:
+                new_data = pd.DataFrame([{"Name": name, "Mobile": mobile, "Aadhar": aadhar, "District": district, "Caste": caste, "Password": password}])
+                try:
+                    df = conn.read(spreadsheet=SHEET_URL)
+                    updated_df = pd.concat([df, new_data], ignore_index=True)
+                    conn.update(spreadsheet=SHEET_URL, data=updated_df)
+                    st.success(t["success"])
+                except:
+                    conn.update(spreadsheet=SHEET_URL, data=new_data)
+                    st.success(t["success"])
+            else:
+                st.error("Fill Name and Mobile!")
+
+# --- 3. LOGIN ---
+elif choice == t["login"]:
+    st.header(t["login"])
+    l_mob = st.text_input(t["mob"])
+    l_pass = st.text_input(t["pass"], type="password")
+    if st.button(t["btn_log"]):
+        try:
+            df = conn.read(spreadsheet=SHEET_URL)
+            check = df[(df['Mobile'].astype(str) == l_mob) & (df['Password'].astype(str) == l_pass)]
+            if not check.empty:
+                st.success("Login Successful!")
+            else:
+                st.error("Wrong details")
+        except:
+            st.error("No data found!")
+
+# --- 4. ADMIN ---
+elif choice == t["admin"]:
+    st.header("Admin")
+    pw = st.text_input("Admin Password", type="password")
+    if pw == "admin123":
+        try:
+            df = conn.read(spreadsheet=SHEET_URL)
+            st.dataframe(df)
+        except:
+            st.write("No data in sheet yet.")
